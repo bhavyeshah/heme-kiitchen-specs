@@ -41,16 +41,33 @@ The system SHALL provide a form in the admin panel to create orders manually for
 - **WHEN** an admin submits the offline order form with no items selected
 - **THEN** the system displays a validation error and does not create the order
 
+### Requirement: Admin can accept or decline pending orders
+The system SHALL display prominent Accept and Decline actions on any order with status "pending". These are the primary actions that start or reject the fulfilment lifecycle.
+
+#### Scenario: Admin accepts a pending order
+- **WHEN** an admin taps "Accept" on a pending order
+- **THEN** the order status changes to "confirmed" and the order moves out of the pending queue
+
+#### Scenario: Admin declines a pending order
+- **WHEN** an admin taps "Decline" on a pending order
+- **THEN** the order status changes to "declined" and the order is marked as a terminal rejected state
+
+#### Scenario: Accept and Decline are not shown on non-pending orders
+- **WHEN** an admin views an order that is not in "pending" status
+- **THEN** the Accept and Decline actions are not shown
+
 ### Requirement: Admin can update order and payment status
-The system SHALL allow the admin to change an order's status and payment status from the order detail view.
+The system SHALL allow the admin to change a confirmed order's status and payment status from the order detail view.
 
 #### Scenario: Admin updates order status
 - **WHEN** an admin selects a new status from the order detail view and saves
 - **THEN** the order status is updated and the list view reflects the change
 
 #### Scenario: Admin marks order as paid
-- **WHEN** an admin taps "Mark as Paid" on an order
+- **WHEN** an admin taps "Mark as Paid" on an order after receiving the customer's UPI payment screenshot on WhatsApp
 - **THEN** payment_status changes to "paid" immediately without a full page reload
+
+<!-- Inventory management is deferred. /admin/inventory will be added when inventory tracking is plugged in. -->
 
 ### Requirement: Admin panel is optimised for mobile use
 The system SHALL render all admin panel pages with a mobile-first layout, with tap targets no smaller than 44×44px, readable font sizes, and no horizontal overflow on screens 375px wide.
