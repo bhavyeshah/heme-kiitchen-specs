@@ -1,4 +1,30 @@
-## ADDED Requirements
+<!-- DEFERRED: Platter builder is out of scope for the initial release.
+     Customers currently select individual products from the catalogue and add them to a cart.
+     Custom platters can be offered by the admin as pre-configured products in the catalogue.
+
+     FUTURE DIRECTION (captured for when this is scoped):
+     - The platter builder will present two distinct groups: dips and accompaniments (requires
+       product classification/categories to be in place first).
+     - Each dip and accompaniment selection will have a defined quantity associated with it
+       (e.g., adding hummus adds a specific portion size, not a free-form amount).
+     - Platter pricing is composition-based — the final price is determined by which dips and
+       accompaniments the customer selects and in what quantities.
+     - Full pricing rules, portion definitions, and configuration details will be provided
+       when the platter builder is formally scoped as a new change.
+
+     OPEN QUESTIONS FOR FUTURE SCOPING:
+     - Is there a fixed platter size (e.g., always 3 dips + 1 accompaniment), or can the
+       customer compose freely?
+     - Is the price a fixed platter price set by the admin, or calculated as a sum of
+       component prices, or a tiered price based on number of components?
+     - Can the same dip be selected more than once (double portion)?
+     - Are there minimum/maximum component constraints?
+
+     The original requirements below are preserved for reference but will be rewritten
+     during formal scoping to reflect the composition-based pricing model. -->
+
+
+## DEFERRED Requirements
 
 ### Requirement: Customer can select dips for a platter
 The system SHALL provide an interactive platter builder page where a customer can select one or more dips from the active product catalog to include in their platter.

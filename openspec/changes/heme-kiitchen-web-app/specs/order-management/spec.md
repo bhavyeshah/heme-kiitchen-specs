@@ -1,7 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Every order has a consistent data structure
-The system SHALL represent all orders (online and offline) with a unified schema: order ID, source (online/offline), status, items (with quantities), total price, customer name, phone, delivery_type, delivery_address (conditional), delivery_charges_applicable, payment method, payment status, optional UPI reference, deleted (boolean, default false), deleted_at (timestamp, nullable), and created/updated timestamps.
+The system SHALL represent all orders (online and offline) with a unified schema: order ID, source (online/offline), status, items, total price, customer name, phone, delivery_type, delivery_address (conditional), delivery_charges_applicable, payment method, payment status, special_instructions (optional string, max 500 characters, nullable), deleted (boolean, default false), deleted_at (timestamp, nullable), and created/updated timestamps.
+
+There is no UPI transaction reference field. Payment is handled entirely offline via WhatsApp — the admin confirms receipt of payment and updates payment_status manually. This eliminates the need for customers to submit a reference at checkout and removes any refund burden if an order is cancelled before payment is made.
+
+Each item in the `items` array SHALL be a snapshot captured at the moment the order is placed, containing: product_id, name, unit_price, and quantity. The `name` and `unit_price` SHALL be copied from the product catalog at order creation time and SHALL NOT change if the product is later edited. This ensures the order record always reflects what the customer saw and agreed to pay.
 
 The `delivery_address` field SHALL be required when `delivery_type` is "home_delivery" and SHALL be null when `delivery_type` is "pickup".
 
@@ -9,6 +13,22 @@ The `delivery_charges_applicable` field SHALL be derived as follows:
 - `false` when `delivery_type` is "pickup"
 - `false` when `delivery_type` is "home_delivery" and `total_price` > 1500
 - `true` when `delivery_type` is "home_delivery" and `total_price` <= 1500
+
+#### Scenario: Order items capture price and name at time of placement
+- **WHEN** an order is created
+- **THEN** each item in the order stores the product's name and unit_price as they were at the moment of order creation
+
+#### Scenario: Product price change does not affect existing orders
+- **WHEN** an admin updates a product's price after an order containing that product has been placed
+- **THEN** the existing order continues to display and use the original unit_price from when the order was placed
+
+#### Scenario: Product name change does not affect existing orders
+- **WHEN** an admin updates a product's name after an order containing that product has been placed
+- **THEN** the existing order continues to display the original product name from when the order was placed
+
+#### Scenario: Order total is calculated from captured unit prices
+- **WHEN** an order is created
+- **THEN** total_price equals the sum of (unit_price × quantity) for all items in the order
 
 #### Scenario: Online order has source "online"
 - **WHEN** an order is created through the customer checkout flow
@@ -150,3 +170,67 @@ The system SHALL provide an API endpoint to list all orders, with optional filte
 #### Scenario: Filter by delivery type
 - **WHEN** a request includes delivery_type=pickup filter
 - **THEN** only pickup orders are returned
+
+### Requirement: Orders support optional special instructions for the chef
+The system SHALL allow an optional `special_instructions` field (string, max 500 characters, nullable) to be set on any order. The field SHALL default to null if not provided. Both online (customer-submitted) and offline (admin-created) orders MAY include special instructions.
+
+Special instructions SHALL be preserved as-is and SHALL be editable by the admin on any non-terminal order, consistent with the existing "Admin can edit order details" requirement.
+
+#### Scenario: Order created with special instructions
+- **WHEN** an order is created with a non-empty special_instructions value
+- **THEN** the order record stores the value as provided (trimmed of leading/trailing whitespace)
+
+#### Scenario: Order created without special instructions
+- **WHEN** an order is created without a special_instructions value
+- **THEN** special_instructions is stored as null
+
+#### Scenario: Special instructions exceed character limit
+- **WHEN** an order is submitted with special_instructions longer than 500 characters
+- **THEN** the system rejects the request with a validation error
+
+#### Scenario: Admin edits special instructions on a non-terminal order
+- **WHEN** an admin updates the special_instructions field on a non-terminal order
+- **THEN** the order record is updated and updated_at is refreshed
+
+### Requirement: Customer receives WhatsApp notification on order placement and high-value status changes
+The system SHALL automatically send a WhatsApp message to the customer's phone number at two points: when an order is first placed, and when the order status changes to confirmed, dispatched, completed, declined, or cancelled. Notifications SHALL be sent for both online and offline orders.
+
+Notifications are triggered server-side — order placement by POST /api/orders, status changes by PATCH /api/orders/:id. The notification is sent after the record is successfully written — a notification failure SHALL NOT prevent the operation from completing. Failures SHALL be logged for debugging.
+
+WhatsApp messages SHALL use pre-approved Meta message templates with the following exact wording:
+
+**On order placement:**
+> Dear {customer_name}, your order is placed.
+
+**On status change (confirmed, dispatched, declined):**
+> Dear {customer_name}, your order status was {old_status}, and new status is {new_status}.
+
+**On order completed:**
+> Dear {customer_name}, your order status was {old_status}, and new status is {new_status}. Enjoy the indulgence.
+
+**On order cancelled:**
+> Dear {customer_name}, we regret to inform that your order is cancelled. We would love to have you back.
+
+#### Scenario: Customer notified when order is placed
+- **WHEN** a new order is successfully created (online or offline)
+- **THEN** a WhatsApp message is sent: "Dear {customer_name}, your order is placed."
+
+#### Scenario: Customer notified on status change to confirmed or dispatched
+- **WHEN** an admin changes order status to confirmed or dispatched
+- **THEN** a WhatsApp message is sent: "Dear {customer_name}, your order status was {old_status}, and new status is {new_status}."
+
+#### Scenario: Customer notified when order is completed
+- **WHEN** an admin marks an order as completed
+- **THEN** a WhatsApp message is sent: "Dear {customer_name}, your order status was {old_status}, and new status is {new_status}. Enjoy the indulgence."
+
+#### Scenario: Customer notified when order is declined
+- **WHEN** an admin declines a pending order
+- **THEN** a WhatsApp message is sent: "Dear {customer_name}, your order status was {old_status}, and new status is {new_status}."
+
+#### Scenario: Customer notified when order is cancelled
+- **WHEN** an admin cancels an order
+- **THEN** a WhatsApp message is sent: "Dear {customer_name}, we regret to inform that your order is cancelled. We would love to have you back."
+
+#### Scenario: Notification failure does not block order operation
+- **WHEN** the WhatsApp API call fails after an order is created or status is updated
+- **THEN** the order record is preserved and the failure is logged; no error is shown to the customer or admin
